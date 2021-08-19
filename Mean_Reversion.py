@@ -1,10 +1,7 @@
 import numpy as np
 from numpy import linalg
 from datetime import date, datetime, timedelta
-import scipy.optimize as opt
-import yfinance as yf
 import pandas as pd
-import matplotlib.pyplot as plt
 from pandas.tseries.offsets import BDay
 
 class Portfolio():
