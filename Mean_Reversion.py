@@ -21,16 +21,17 @@ class Portfolio():
 
         self.EG_weights = [np.ones(len(self.Tickers)) / len(self.Tickers)]
     
-    def Mean_Reversion(self, epsilon=5, alpha=np.arange(0, 1, .1)[1:], eta=10):
+    def Mean_Reversion(self, epsilon=.5, alpha=np.arange(0, 1, .1)[1:], eta=10):
         """
 
         Parameters
         -----------
-            epsilon: (float) Reversion threshold with range [1, inf). 
-            alpha: (float) Exponential ratio for the Exponentially Weighted Average with range (0,1).\\
+            :param epsilon: (float) Reversion threshold with range [1, inf). 
+            :param alpha: (float) Exponential ratio for the Exponentially Weighted Average with range (0,1).\\
             --> Larger Alpha = More Importance on Recent Prices\\
             --> Smaller Alpha = More Importance on Historical Prices
-            eta: (float) "Learning Rate AKA Regulator"
+            :param eta: (float) "Learning Rate AKA Regulator"
+            :return: (pd.DataFrame) Historical Weights, (pd.DataFrame) Tomorrow's Predicted Weights
 
         """
         ### Vars ###
@@ -48,39 +49,39 @@ class Portfolio():
 
         ### Create Portfolio through our iterations ###
 
-        for iteration in range(len(Total_Time)):
+        for iteration in range(len(Total_Time)): ### Iterating Through Time from Start to Finish
 
-            Price_Data = Price_Rels[:iteration+1]
-
-            T, N = Price_Data.shape
+            Price_Data = Price_Rels[:iteration+1] #Updates Historical Prices
 
             for i, a in enumerate(self.alpha):
 
-                self.Losses[i] += np.mean((Price_Data[-1] - self.Price_Relative_EWMA[i])**2)
+                self.Losses[i] += np.mean((Price_Data[-1] - self.Price_Relative_EWMA[i])**2) #Cumulative MSE
 
-                EWMA = a + (1 - a) * self.Price_Relative_EWMA[i] / Price_Data[-1]
+                EWMA = a + (1 - a) * self.Price_Relative_EWMA[i] / Price_Data[-1] #Exponetial Moving Average Price Change
 
-                self.Price_Relative_EWMA[i] = EWMA 
+                self.Price_Relative_EWMA[i] = EWMA  #Add this EWMA to matrix
             
-            Weights = -self.eta * self.Losses
+            Weights = -self.eta * self.Losses #Function (2)
 
-            Weights = np.exp(Weights) / np.sum(np.exp(Weights))
+            Weights = np.exp(Weights) / np.sum(np.exp(Weights)) #Function (2)
 
-            Relatives = self.Price_Relative_EWMA.T.dot(Weights)
+            Relatives = self.Price_Relative_EWMA.T.dot(Weights) #Function (1)
 
-            Loss_Func = max(0, (self.epsilon - np.dot(self.EG_weights[-1],Relatives)))
+            Loss_Func = max(0, (self.epsilon - np.dot(self.EG_weights[-1],Relatives))) #Function (6),(7),(8)
 
-            Mean_Rel = np.mean(Relatives)
+            Mean_Rel = np.mean(Relatives) #Function (6),(7),(8)
 
-            Denominator = (np.dot((Relatives - Mean_Rel),(Relatives - Mean_Rel)))
+            Denominator = (np.dot((Relatives - Mean_Rel),(Relatives - Mean_Rel))) #Function (6),(7),(8)
 
-            if Denominator != 0:
+            if Denominator != 0: 
                 Lamd = Loss_Func / Denominator
             
             else:
                 Lamd = 0
             
             new_weight = self.EG_weights[-1] + Lamd*(Relatives - Mean_Rel)
+
+            ###### SIMPLEX PROJECTION #######
 
             Desc = np.sort(new_weight)[::-1] #Descending Order
 
@@ -104,11 +105,14 @@ class Portfolio():
 
                 final_weight = np.maximum(new_weight - theta, 0)
             
+            ###### SIMPLEX PROJECTION #######
+            
             self.EG_weights.append(final_weight)
         
         Historical_Weights = pd.DataFrame(self.EG_weights[:-1], columns=Prices.columns, index=Prices.index)
 
-        Predicted_Weights = pd.DataFrame(self.EG_weights[-1:], columns=Prices.columns, index=(Historical_Weights.index[-1:] + BDay(1)))
+        Predicted_Weights = pd.DataFrame(self.EG_weights[-1:], columns=Prices.columns, index=(Historical_Weights.index[-1:] + BDay(1))) #Tomorrow's Predicted Weights
         
         return Historical_Weights, Predicted_Weights
+
            
